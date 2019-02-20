@@ -1,0 +1,9 @@
+*.pyc
+*.log
+*.json
+*.log
+*.jpg
+*.prefs
+.idea
+.vscode
+wlwjob.db

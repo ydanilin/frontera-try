@@ -1,0 +1,40 @@
+Steps to struggle against compiling on Windows
+----------------------------------------------
+
+**************************************************
+(If did not do yet) Install C++ compiler on Windows (pretty crazy process):
+Read link:
+https://docs.microsoft.com/ru-ru/visualstudio/install/create-an-offline-installation-of-visual-studio?view=vs-2017
+After getting above crazy details, here is
+exact build tools component ids:
+https://docs.microsoft.com/ru-ru/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2017#visual-c-build-tools
+
+command to create:
+vs_buildtools__1207471025.1547837321.exe --layout c:\ebanina --add Microsoft.VisualStudio.Component.Static.Analysis.Tools --add Microsoft.VisualStudio.Component.VC.CoreBuildTools --add Microsoft.VisualStudio.Component.VC.Redist.14.Latest --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.Windows10SDK --add Microsoft.VisualStudio.Component.VC.CMake.Project --add Microsoft.VisualStudio.Component.Windows10SDK.17134 --add Microsoft.VisualStudio.Component.VC.140 --add Microsoft.VisualStudio.Component.VC.CLI.Support --lang en-US
+
+created 2,77 Gb govna
+Installation steps (installed on Windows 7, SP1 needed):
+0. Make sure you have SP1 if using Windows 7
+1. Double-click on every certificate in c:\ebanina\certificates folder - import to automatic location
+2. Switch off internet (optional)
+3. Install with the same command as above BUT WITHOUT --layout and --lang
+4. Do not change everything when VS installer big window pops up
+**************************************************
+
+
+**************************************************
+COMPILING
+
+0. "escherba" link needed below: https://github.com/escherba/python-cityhash
+1. Download this repo: https://github.com/xcoco/python-cityhash-windows This is the same like "escherba" repo, only file city.cc changed in lines 31, 106
+2. Adjust imports in setup.py to be compatible with Python 3.6 (take from link "escherba"), also add class BinaryDistribution(Distribution) from escherba. 
+3. Important! Set the version to 0.2.0 in setup() function, Frontiera requires newer than 0.1.7
+4. Launch "x86 Native Tools Command Prompt for VS 2017" by command:
+%comspec% /k "C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvars32.bat"
+5. In that prompt, activate your Python environment
+6. Build the package: python setup.py bdist_wheel
+7. Go to ./dist subdirectory. The wheel is there. install it via:
+pip install <package.whl>
+8. Test installed package by playing with import, use functions like described in readme of escherba.
+
+**************************************************

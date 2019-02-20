@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>webpilot</title>
+  <style>
+      code{white-space: pre-wrap;}
+      span.smallcaps{font-variant: small-caps;}
+      span.underline{text-decoration: underline;}
+      div.column{display: inline-block; vertical-align: top; width: 50%;}
+  </style>
+  <link rel="stylesheet" href="devstyle.css" />
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<h1 id="crawling-big-classified-ads-multipaged-portal-with-frontera-and-scrapy">Crawling Big Classified Ads Multipaged Portal with Frontera and Scrapy</h1>
+<h2 id="what-is-classified-ads-multipaged-portal">What is Classified Ads Multipaged Portal</h2>
+<p>Sometimes customers ask to extract data from websites, stuffed with tons of classifieds like companies advertisments, job offerings, goods listings etc. We call such websites Classified Ads Multipaged Portal and will name it here just <strong>portal</strong> for simplicity.</p>
+<p>Often such portals have a <strong>search</strong> box in the main page, which leads you to <strong>listing pages</strong> when you enter a search criteria. Every classified ad on the listing (which we will refer as <strong>item</strong>) contains mostly brief information like name, address, web, which we need to scrape. Also, the customer may ask you to grab additional details from item <strong>details page</strong>, which you can get when you click on a classified ad.</p>
+<p>The customer gives you about dozen or two of search criterias which we inject into our scraping system as initial (<strong>seed</strong>) URLs (via a text or CSV file) and the process begins.</p>
+<p>Below is a typical structure and workflow to do a job:</p>
+<figure>
+<img src="webpilot/camp_elems.svg" alt="Elements of a Classified Ads Multipaged Portal" class="center" /><figcaption>Elements of a Classified Ads Multipaged Portal</figcaption>
+</figure>
+<h2 id="problem-statement-why-do-we-need-a-job-state-persistency-in-our-scraper">Problem Statement: Why do we need a “Job State Persistency” in our Scraper</h2>
+<p>If we’re talking about scraping a portal, which contains hundreds of thousands records, <strong>it is unlikely that we will do all our job in a single session</strong>. Several reasons may be for that – perhaps we want to inspect the portion of the data collected before proceeding further (which is definitely a good practice!) or we know that, if we exceed some amount of requests the site will temporary ban us so we need to stop and recharge the session after waiting some time, etc.</p>
+<p>Furthermore, we must be prepared to face with errors and session breakdowns on whatever step. Never can we expect that data or webpages are always uniform and therefore we may catch an error, which we could not ever imagine.</p>
+<p>That is why we need to maintain persistency in our scraper - to be able to start exactly from the point where we finished before. This way we need the mechanisms to handle the following use cases:</p>
+<ul>
+<li>skip already processed searches</li>
+<li>skip already processed pages within firm listing of a category</li>
+<li>(optional) avoid duplicates in scraped items</li>
+</ul>
+<p>After some experience with “handmade” solutions, we considered to use <a href="https://scrapinghub.com/open-source">Scrapinghub’s open source</a> <a href="https://github.com/scrapinghub/frontera">Frontera</a> package, which does exactly what we need: keeps the scraping job state persistent in a database so we can keep calm that scraper will restart exactly from where it stopped and nothing will be missed.</p>
+<h2 id="able-to-see-job-progress-discovery-crawls-and-payload-crawls">Able to see Job Progress: Discovery Crawls and Payload Crawls</h2>
+<p>Scraping a huge portal may take hours and even days. Obviously it is a good idea to see where we are and, more important, to see when we finish. To make such “progress indicator”, we must know how much work we have in total. Coming back to our multipaged portal, this “work estimation” process can be expressed as <strong>discovery crawl</strong> to do the following:</p>
+<ul>
+<li>walk only across paging links first</li>
+<li>record amount of pages when we reached the last page within each search</li>
+<li>record amount of items on each page - to signal when a particular page is completed during <strong>payload crawl</strong> and to calculate overall total</li>
+</ul>
+<p>Next two items are not related directly to discovery process but should be implemented at discovery crawl stage in order not to do same work twice:</p>
+<ul>
+<li>collect links to items details pages</li>
+<li>scrape information about items which is already available on listing pages</li>
+</ul>
+<p>Due to it’s built-in mechanism of <strong>link scoring</strong>, <a href="https://github.com/scrapinghub/frontera">Frontera</a> package is able to handle such two-phase crawl mechanism with just small alterations in code.</p>
+<p>Last, to illustrate discussed above, we provide an idea how scraper monitoring dashboard may look like:</p>
+<figure>
+<img src="webpilot/discover_dash.svg" alt="Dashboard in Discovery mode" class="center" /><figcaption>Dashboard in Discovery mode</figcaption>
+</figure>
+<figure>
+<img src="webpilot/payload_dash.svg" alt="Dashboard in Payload mode" class="center" /><figcaption>Dashboard in Payload mode</figcaption>
+</figure>
+<h2 id="frontera-single-process-workflow">Frontera Single Process Workflow</h2>
+<p>Scraping job using Frontera starts with injecting into the system an initial requests, which are called <strong>seeds</strong>. This injection is performed via separate small script, which saves the seeds directly into the database (Queue table).</p>
+<p>After that you turn the key and the system starts. The drive unit in the circle is Scrapy Engine, which periodically asks Frontera Scheduler for new requests. Then Scrapy fires the requests into Internet, extract new links from responses, convert these links into new Requests and push them back to the Scheduler. Now this is Frontera’s turn.</p>
+<p>The goal of crawling frontier is to save, arrange, order and deliver new requests to spiders. The scheme below introduces the Frontera functionality. From this scheme we will see where to insert our customized functionality - Job State Persistency and Job Progress Reporting.</p>
+<figure>
+<img src="webpilot/frontera_workflow.svg" alt="Frontera Single Process Workflow" class="center" /><figcaption>Frontera Single Process Workflow</figcaption>
+</figure>
+</body>
+</html>

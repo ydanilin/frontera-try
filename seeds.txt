@@ -1,0 +1,3 @@
+url, search
+https://www.wlw.de/de/firmen/tiefdruck, Tiefdruck
+https://www.wlw.de/de/firmen/rollenoffsetdruck, Rollenoffsetdruck
