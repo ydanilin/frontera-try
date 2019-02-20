@@ -63,5 +63,13 @@
 <figure>
 <img src="webpilot/frontera_workflow.svg" alt="Frontera Single Process Workflow" class="center" /><figcaption>Frontera Single Process Workflow</figcaption>
 </figure>
+<h2 id="webpilot-protocol">WebPilot protocol</h2>
+<p>First, let us discuss briefly the Scrapy part of the work. We mentioned above that Scrapy extracts new links form pages he visited. On the ads portal workflow scheme we see that, on Listing Pages there are two types of links: Paging link (B) and Item details links (C). We need to identify each link precisely: what kind of link it is, where it originated from and what it targets to.</p>
+<p>The situation is that links actually originating in the Scrapy side, but will be handled on the Frontera side. Therefore they must communicate the link details and understand each other. We must agree on data formats and we propose to establish this as <strong>WebPilot protocol</strong>.</p>
+<ol type="1">
+<li>Both Scrapy and Frontera provide (by design) special field called <code>meta</code> in the <code>Request</code> and <code>Response</code> classes.</li>
+<li>Block of information about link is called <code>flight</code> and to be stored in meta inder <code>meta['flight']</code> key.</li>
+<li><code>meta['flight']</code> data structure must be carried out through the whole (single) Request-Response-Request-Response… chain. The fact is that the frameworks copy meta field form <code>Request</code> to <code>Response</code> automatically, but <strong>do not do so</strong> for <code>Request</code>s, <strong>newly born from extracting links</strong> from <code>Response</code> webpage!</li>
+</ol>
 </body>
 </html>

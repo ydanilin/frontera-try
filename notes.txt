@@ -121,30 +121,6 @@ make(space)(tab)(tab)
 Это нирвана!
 
 
- scrapy\core\engine.py(149)_next_request_from_scheduler()
--> request = slot.scheduler.next_request()
-
-  frontera\contrib\scrapy\schedulers\frontier.py(100)next_request()
--> request = self._get_next_request()
-
-  frontera\contrib\scrapy\schedulers\frontier.py(148)_get_next_request()
--> requests = self.frontier.get_next_requests(key_type=info['key_type'], overused_keys=info['overused_keys'])
-
-  frontera\utils\managers.py(29)get_next_requests()
--> frontier_requests = self.manager.get_next_requests(max_next_requests=max_next_requests, **kwargs)
-
-  frontera\core\manager.py(527)get_next_requests()
--> next_requests = super(LocalFrontierManager, self).get_next_requests(max_next_requests, **kwargs)
-
-  frontera\core\manager.py(251)get_next_requests()
--> next_requests = self.backend.get_next_requests(max_next_requests, **kwargs)
-
-  c:\tp\docs\g\pitonizm\frontera\tutorial\frontera\backend.py(37)get_next_requests()
--> batch.extend(self.queue.get_next_requests(max_next_requests, partition_id, score, **kwargs))
-
-> c:\tp\docs\g\pitonizm\frontera\tutorial\frontera\backend.py(57)get_next_requests()
-
-
 http://pandoc.org/
 http://www.software-architects.com/devblog/2017/05/23/Markdown-pandoc-conceptual-documents
 http://www.flutterbys.com.au/stats/tut/tut17.3.html

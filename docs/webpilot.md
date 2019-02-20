@@ -57,5 +57,16 @@ The goal of crawling frontier is to save, arrange, order and deliver new request
 
 ![Frontera Single Process Workflow](webpilot/frontera_workflow.svg){.center}
 
+## WebPilot protocol
+
+First, let us discuss briefly the Scrapy part of the work. We mentioned above that Scrapy extracts new links form pages he visited. On the ads portal workflow scheme we see that, on Listing Pages there are two types of links: Paging link (B) and Item details links (C). We need to identify each link precisely: what kind of link it is, where it originated from and what it targets to.
+
+The situation is that links actually originating in the Scrapy side, but will be handled on the Frontera side. Therefore they must communicate the link details and understand each other. We must agree on data formats and we propose to establish this as **WebPilot protocol**.
+
+1. Both Scrapy and Frontera have (by design) special field called `meta` to store arbitrary information in the `Request` and `Response` classes.
+2. Block of information about link is called `flight` and to be stored in meta inder `meta['flight']` key.
+3. `meta['flight']` data structure must be carried out through the whole (single) Request-Response-Request-Response... chain. The fact is that the frameworks copy meta field form `Request` to `Response` automatically, but **do not do so** for `Request`s, **newly born from extracting links** from `Response` webpage.
+4. To describe `flight` data structure, first we show the scraping process from Fig. 1 in simplified form but showing the `meta['flight']` examples.
+
 [Scrapinghub's open source]: https://scrapinghub.com/open-source
 [Frontera]: https://github.com/scrapinghub/frontera
