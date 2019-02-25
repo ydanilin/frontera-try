@@ -55,18 +55,6 @@ class WlwSpider(scrapy.Spider):
         yield from chain(paging_requests, items_requests)
 
     @staticmethod
-    def make_item_request(link):
-        url, _ = filter_qparams([], 'retain', link.url)
-        firma_id = get_id_from_path(url)
-        flight = {
-            'dest': 'item',
-            'details': {'firma_id': firma_id}
-        }
-        r = Request(url)
-        r.meta.update(flight=flight)
-        return r
-
-    @staticmethod
     def make_paging_request(link):
         url, page_to = filter_qparams(['page'], 'retain', link.url)
         flight = {
@@ -77,3 +65,14 @@ class WlwSpider(scrapy.Spider):
         r.meta.update(flight=flight)
         return r
 
+    @staticmethod
+    def make_item_request(link):
+        url, _ = filter_qparams([], 'retain', link.url)
+        firma_id = get_id_from_path(url)
+        flight = {
+            'dest': 'item',
+            'details': {'firma_id': firma_id}
+        }
+        r = Request(url)
+        r.meta.update(flight=flight)
+        return r
