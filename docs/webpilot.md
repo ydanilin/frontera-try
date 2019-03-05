@@ -64,7 +64,7 @@ We mentioned above that Scrapy extracts new links form pages he visited. On the 
 The situation is that links actually originating in the Scrapy side, but will be handled on the Frontera side. Therefore they must communicate the link details and understand each other. We must agree on data formats and we propose to establish this as **WebPilot protocol**.
 
 1. Both Scrapy and Frontera have (by design) special field called `meta` to store arbitrary information in the `Request` and `Response` classes.
-2. Block of information about link is called `flight` and to be stored in meta inder `meta['flight']` key.
+2. Block of information about link is called `flight` and to be stored in meta under `meta['flight']` key.
 3. `meta['flight']` data structure must be carried out through the whole (single) Request-Response-Request-Response... chain. The fact is that the frameworks copy meta field form `Request` to `Response` automatically, but **do not do so** for `Request`s, **newly born from extracting links** from `Response` webpage.
 4. To describe `flight` data structure, we show the scraping process from Fig. 1 in simplified form but showing the `meta['flight']` examples.
 
@@ -95,7 +95,7 @@ from scrapy.linkextractors import LinkExtractor
 
 When Scrapy has downloaded a page, it invokes (by default) `parse()` callback to process the response. This is the place where our `LinkExtractor`s come into play. Remember that paging links are of the first priority, so first we call `extract_links()` from the paging extractor, than from items one.
 
-Essentially `parse()` is a generator, which must yield `Request` instances. So we process link in each list and make chain of the two iterators:
+Essentially `parse()` is a generator, which must yield `Request` instances. So we process link in each list and yield from chain of the two iterators:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ {.python .numberLines}
 from itertools import chain
@@ -147,6 +147,56 @@ from itertools import chain
 To summarize this part: only Scrapy knows if he got paging link or item details link, and only Scrapy can extract the page number paging link points to. Therefore we need this bare minimum setup to correctly adjust `flight` information for further Frontera processing.
 
 ### Frontera setup
+
+#### How things are started
+
+As you see from the diagram above, scraping job is a round-trip process of feeding requests - receiving responses - generation of next requests. The question remains how to inject initial requests befor turning the key to start the engine.
+To switch on "onboard power supply" of the machine Frontera provides special utility script
+`python -m frontera.utils.add_seeds --config <path.to.frontera.settings> --seeds-file seeds.txt`, which does two things:
+
+- create the database with all necessary tables
+- opens up a text file with seed URLs
+- calls `read_seeds()` method of `Strategy` class, with file `stream` argument
+
+We mention here that in this text file we can supply custom information, along with seed URLs. Suppose customer ask us to track from which search criteria items were originated. This way feed txt file can be orgainized like csv as follows
+```
+url, search
+https://www.example.com/list?query=search%2001, Search 01
+https://www.example.com/list?query=search%2002, Search 02
+```
+Now we need to override `read_seeds()` method to adapt it to read our csv structure:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ {.python .numberLines}
+from io import TextIOWrapper
+
+    def read_seeds(self, stream):
+        text = TextIOWrapper(stream, encoding='utf-8')
+        csv_records = DictReader(text, skipinitialspace=True)
+        for entry in csv_records:
+            url = entry.pop('url')
+            flight = {
+                'dest': 'page',
+                'from': '0',
+                'to': '1',
+                'details': dict(entry),
+            }
+            r = self.create_request(url.strip(), meta=dict(flight=flight))
+            self.schedule(r)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here `TextIOWrapper` is needed because Frontera supplies `stream` argument as binary stream. Creation of `flight` structure in *start* requests was discussed in case A1 of "Flight data structure usage" figure, the only trick here is, that after we popped `'url'` key from `DictReader` entry, the rest of that disctionary may contain *arbitrary amount of custom data*, not only "search" as in our example.
+
+The last action `read_seeds()` must perform is to call `schedule()` method of its `Strategy` class.
+
+**Note:** we would not discuss here how to store custom data in The Database, that's rather easy with Frontera framework but we would like to shift this discussion into separate section. Just mention here shortly that we would need to override `Queue.schedule()` method to include custom field in `QueueModel` class instantiation.
+
+#### WebPilot `meta['flight']` data structure handover to newly discovered links
+
+In the introduction to WebPilot protocol (Item 4) we mentioned that the freameworks do not pass `meta` information from origin `Request` to `Request`s spawned by it. Luckily, this can be implemented within the same project `Strategy` class. Our method of interest is `links_extracted(request, links)`, where parameters are:
+
+- `request`: the original request, which fetched webpage from which LinkExtractors scraped new links;
+- `links`: the list of `Request`s spawned by the original request. We guess name "links" creates a little bit misunderstanding here, because these entities in fact are not URLs but already `Request` instances, pointing to these URLs.
+
 
 [Scrapinghub's open source]: https://scrapinghub.com/open-source
 [Frontera]: https://github.com/scrapinghub/frontera

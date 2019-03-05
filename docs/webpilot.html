@@ -131,7 +131,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <p>The situation is that links actually originating in the Scrapy side, but will be handled on the Frontera side. Therefore they must communicate the link details and understand each other. We must agree on data formats and we propose to establish this as <strong>WebPilot protocol</strong>.</p>
 <ol type="1">
 <li>Both Scrapy and Frontera have (by design) special field called <code>meta</code> to store arbitrary information in the <code>Request</code> and <code>Response</code> classes.</li>
-<li>Block of information about link is called <code>flight</code> and to be stored in meta inder <code>meta['flight']</code> key.</li>
+<li>Block of information about link is called <code>flight</code> and to be stored in meta under <code>meta['flight']</code> key.</li>
 <li><code>meta['flight']</code> data structure must be carried out through the whole (single) Request-Response-Request-Response… chain. The fact is that the frameworks copy meta field form <code>Request</code> to <code>Response</code> automatically, but <strong>do not do so</strong> for <code>Request</code>s, <strong>newly born from extracting links</strong> from <code>Response</code> webpage.</li>
 <li>To describe <code>flight</code> data structure, we show the scraping process from Fig. 1 in simplified form but showing the <code>meta['flight']</code> examples.</li>
 </ol>
@@ -154,7 +154,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <a class="sourceLine" id="cb1-10" title="10">            <span class="co"># rules for ITEM DETAILS links as per Scrapy docs</span></a>
 <a class="sourceLine" id="cb1-11" title="11">        )</a></code></pre></div>
 <p>When Scrapy has downloaded a page, it invokes (by default) <code>parse()</code> callback to process the response. This is the place where our <code>LinkExtractor</code>s come into play. Remember that paging links are of the first priority, so first we call <code>extract_links()</code> from the paging extractor, than from items one.</p>
-<p>Essentially <code>parse()</code> is a generator, which must yield <code>Request</code> instances. So we process link in each list and make chain of the two iterators:</p>
+<p>Essentially <code>parse()</code> is a generator, which must yield <code>Request</code> instances. So we process link in each list and yield from chain of the two iterators:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode numberSource python numberLines"><code class="sourceCode python"><a class="sourceLine" id="cb2-1" title="1"><span class="im">from</span> itertools <span class="im">import</span> chain</a>
 <a class="sourceLine" id="cb2-2" title="2"></a>
 <a class="sourceLine" id="cb2-3" title="3">    <span class="kw">def</span> parse(<span class="va">self</span>, response):</a>
@@ -197,5 +197,41 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <a class="sourceLine" id="cb3-26" title="26">        <span class="cf">return</span> r</a></code></pre></div>
 <p>To summarize this part: only Scrapy knows if he got paging link or item details link, and only Scrapy can extract the page number paging link points to. Therefore we need this bare minimum setup to correctly adjust <code>flight</code> information for further Frontera processing.</p>
 <h3 id="frontera-setup">Frontera setup</h3>
+<h4 id="how-things-are-started">How things are started</h4>
+<p>As you see from the diagram above, scraping job is a round-trip process of feeding requests - receiving responses - generation of next requests. The question remains how to inject initial requests befor turning the key to start the engine. To switch on “onboard power supply” of the machine Frontera provides special utility script <code>python -m frontera.utils.add_seeds --config &lt;path.to.frontera.settings&gt; --seeds-file seeds.txt</code>, which does two things:</p>
+<ul>
+<li>create the database with all necessary tables</li>
+<li>opens up a text file with seed URLs</li>
+<li>calls <code>read_seeds()</code> method of <code>Strategy</code> class, with file <code>stream</code> argument</li>
+</ul>
+<p>We mention here that in this text file we can supply custom information, along with seed URLs. Suppose customer ask us to track from which search criteria items were originated. This way feed txt file can be orgainized like csv as follows</p>
+<pre><code>url, search
+https://www.example.com/list?query=search%2001, Search 01
+https://www.example.com/list?query=search%2002, Search 02</code></pre>
+<p>Now we need to override <code>read_seeds()</code> method to adapt it to read our csv structure:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource python numberLines"><code class="sourceCode python"><a class="sourceLine" id="cb5-1" title="1"><span class="im">from</span> io <span class="im">import</span> TextIOWrapper</a>
+<a class="sourceLine" id="cb5-2" title="2"></a>
+<a class="sourceLine" id="cb5-3" title="3">    <span class="kw">def</span> read_seeds(<span class="va">self</span>, stream):</a>
+<a class="sourceLine" id="cb5-4" title="4">        text <span class="op">=</span> TextIOWrapper(stream, encoding<span class="op">=</span><span class="st">&#39;utf-8&#39;</span>)</a>
+<a class="sourceLine" id="cb5-5" title="5">        csv_records <span class="op">=</span> DictReader(text, skipinitialspace<span class="op">=</span><span class="va">True</span>)</a>
+<a class="sourceLine" id="cb5-6" title="6">        <span class="cf">for</span> entry <span class="kw">in</span> csv_records:</a>
+<a class="sourceLine" id="cb5-7" title="7">            url <span class="op">=</span> entry.pop(<span class="st">&#39;url&#39;</span>)</a>
+<a class="sourceLine" id="cb5-8" title="8">            flight <span class="op">=</span> {</a>
+<a class="sourceLine" id="cb5-9" title="9">                <span class="st">&#39;dest&#39;</span>: <span class="st">&#39;page&#39;</span>,</a>
+<a class="sourceLine" id="cb5-10" title="10">                <span class="st">&#39;from&#39;</span>: <span class="st">&#39;0&#39;</span>,</a>
+<a class="sourceLine" id="cb5-11" title="11">                <span class="st">&#39;to&#39;</span>: <span class="st">&#39;1&#39;</span>,</a>
+<a class="sourceLine" id="cb5-12" title="12">                <span class="st">&#39;details&#39;</span>: <span class="bu">dict</span>(entry),</a>
+<a class="sourceLine" id="cb5-13" title="13">            }</a>
+<a class="sourceLine" id="cb5-14" title="14">            r <span class="op">=</span> <span class="va">self</span>.create_request(url.strip(), meta<span class="op">=</span><span class="bu">dict</span>(flight<span class="op">=</span>flight))</a>
+<a class="sourceLine" id="cb5-15" title="15">            <span class="va">self</span>.schedule(r)</a></code></pre></div>
+<p>Here <code>TextIOWrapper</code> is needed because Frontera supplies <code>stream</code> argument as binary stream. Creation of <code>flight</code> structure in <em>start</em> requests was discussed in case A1 of “Flight data structure usage” figure, the only trick here is, that after we popped <code>'url'</code> key from <code>DictReader</code> entry, the rest of that disctionary may contain <em>arbitrary amount of custom data</em>, not only “search” as in our example.</p>
+<p>The last action <code>read_seeds()</code> must perform is to call <code>schedule()</code> method of its <code>Strategy</code> class.</p>
+<p><strong>Note:</strong> we would not discuss here how to store custom data in The Database, that’s rather easy with Frontera framework but we would like to shift this discussion into separate section. Just mention here shortly that we would need to override <code>Queue.schedule()</code> method to include custom field in <code>QueueModel</code> class instantiation.</p>
+<h4 id="webpilot-metaflight-data-structure-handover-to-newly-discovered-links">WebPilot <code>meta['flight']</code> data structure handover to newly discovered links</h4>
+<p>In the introduction to WebPilot protocol (Item 4) we mentioned that the freameworks do not pass <code>meta</code> information from origin <code>Request</code> to <code>Request</code>s spawned by it. Luckily, this can be implemented within the same project <code>Strategy</code> class. Our method of interest is <code>links_extracted(request, links)</code>, where parameters are:</p>
+<ul>
+<li><code>request</code>: the original request, which fetched webpage from which LinkExtractors scraped new links;</li>
+<li><code>links</code>: the list of <code>Request</code>s spawned by the original request. We guess name “links” creates a little bit misunderstanding here, because these entities in fact are not URLs but already <code>Request</code> instances, pointing to these URLs.</li>
+</ul>
 </body>
 </html>
